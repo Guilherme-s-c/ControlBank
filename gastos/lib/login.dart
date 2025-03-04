@@ -23,7 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // Verifica se os campos estão vazios
     if (email.isEmpty || senha.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, preencha todos os campos!')),
+        const SnackBar(content: Text('Por favo, preencha todos os campos!')),
       );
       return;
     }
