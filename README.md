@@ -1,4 +1,4 @@
-#ControlBank
+ControlBank
 
 Sobre o Projeto
 
