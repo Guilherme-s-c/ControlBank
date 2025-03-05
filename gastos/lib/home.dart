@@ -6,7 +6,7 @@ import 'gasto.dart';
 import 'adiciona_ganho.dart';
 import 'globals.dart' as globals;
 import 'detalhe_gasto.dart';
-import 'detalhe_conta.dart';
+import 'detalhe_conta.dart'; // Importe a tela de detalhes das contas
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -362,8 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => DetalheContaScreen(
-                                      contaId: conta['id']),
+                                  builder: (context) => DetalheContaScreen(),
                                 ),
                               );
                             },
@@ -386,8 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => DetalheContaScreen(
-                                      contaId: conta['id']),
+                                  builder: (context) => DetalheContaScreen(),
                                 ),
                               );
                             },

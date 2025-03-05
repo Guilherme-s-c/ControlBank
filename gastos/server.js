@@ -287,7 +287,12 @@ app.get('/gastos', async (req, res) => {
 
 app.get('/contas', async (req, res) => {
   try {
-      const { user_id, mes, ano } = req.query;
+      const { user_id, mes, ano, eh_mensal } = req.query;
+      console.log('user_id:', user_id); // Debug
+      console.log('mes:', mes); // Debug
+      console.log('ano:', ano); // Debug
+      console.log('eh_mensal:', eh_mensal); // Debug
+
       let query = 'SELECT * FROM conta WHERE user_id = ?';
       let params = [user_id];
 
@@ -296,7 +301,17 @@ app.get('/contas', async (req, res) => {
           params.push(`${ano}-${mes.padStart(2, '0')}`);
       }
 
+      if (eh_mensal) {
+          query += ' AND eh_mensal = ?';
+          params.push(eh_mensal);
+      }
+
+      console.log('Query:', query); // Debug
+      console.log('Params:', params); // Debug
+
       const [results] = await pool.query(query, params);
+      console.log('Resultados:', results); // Debug
+
       res.json(results);
   } catch (err) {
       console.error('Erro na conexão:', err);
@@ -304,7 +319,90 @@ app.get('/contas', async (req, res) => {
   }
 });
 
+app.post('/conta_paga', async (req, res) => {
+  try {
+    const { conta_id, data_pagamento } = req.body;
+    const query = 'INSERT INTO conta_paga (conta_id, data_pagamento) VALUES (?, ?)';
+    const params = [conta_id, data_pagamento];
 
+    await pool.query(query, params);
+    res.status(200).json({ message: 'Conta marcada como paga' });
+  } catch (err) {
+    console.error('Erro ao marcar como pago:', err);
+    res.status(500).json({ error: 'Erro ao marcar como pago' });
+  }
+});
+
+app.delete('/contas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = 'DELETE FROM conta WHERE id = ?';
+    const params = [id];
+
+    await pool.query(query, params);
+    res.status(200).json({ message: 'Conta excluída com sucesso' });
+  } catch (err) {
+    console.error('Erro ao excluir conta:', err);
+    res.status(500).json({ error: 'Erro ao excluir conta' });
+  }
+});
+
+app.get('/conta_paga', async (req, res) => {
+  try {
+    const { conta_id, mes, ano } = req.query;
+    const query = 'SELECT * FROM conta_paga WHERE conta_id = ? AND DATE_FORMAT(data_pagamento, "%Y-%m") = ?';
+    const params = [conta_id, `${ano}-${mes}`];
+
+    const [results] = await pool.query(query, params);
+    res.json(results);
+  } catch (err) {
+    console.error('Erro ao buscar pagamentos:', err);
+    res.status(500).json({ error: 'Erro ao buscar pagamentos' });
+  }
+});
+
+app.get('/contas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = 'SELECT * FROM conta WHERE id = ?';
+    const params = [id];
+
+    const [results] = await pool.query(query, params);
+    res.json(results[0]); // Retorna a primeira linha (única conta)
+  } catch (err) {
+    console.error('Erro ao buscar conta:', err);
+    res.status(500).json({ error: 'Erro ao buscar conta' });
+  }
+});
+
+app.get('/contas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = 'SELECT * FROM conta WHERE id = ?';
+    const params = [id];
+
+    const [results] = await pool.query(query, params);
+    res.json(results[0]); // Retorna a primeira linha (única conta)
+  } catch (err) {
+    console.error('Erro ao buscar conta:', err);
+    res.status(500).json({ error: 'Erro ao buscar conta' });
+  }
+});
+app.put('/contas/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { titulo, valor, data_conta } = req.body;
+
+    const query = 'UPDATE conta SET titulo = ?, valor = ?, data_conta = ? WHERE id = ?';
+    const params = [titulo, valor, data_conta, id];
+
+    await pool.query(query, params);
+    res.status(200).json({ message: 'Conta atualizada com sucesso' });
+  } catch (err) {
+    console.error('Erro ao atualizar conta:', err);
+    res.status(500).json({ error: 'Erro ao atualizar conta' });
+  }
+});
 app.post('/ganhos', async (req, res) => {
     const { user_id, descricao, valor, data_recebimento, eh_recorrente, dia_vencimento } = req.body;
 

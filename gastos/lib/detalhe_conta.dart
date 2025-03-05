@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert'; // Para decodificar o JSON
-import 'globals.dart' as globals; // Importando a variável userId
+import 'dart:convert';
+import 'globals.dart' as globals;
+import 'editar_conta.dart'; // Importe a tela de edição
 
 class DetalheContaScreen extends StatefulWidget {
-  final int contaId;
-
-  const DetalheContaScreen({super.key, required this.contaId});
+  const DetalheContaScreen({super.key});
 
   @override
   _DetalheContaScreenState createState() => _DetalheContaScreenState();
@@ -14,39 +13,33 @@ class DetalheContaScreen extends StatefulWidget {
 
 class _DetalheContaScreenState extends State<DetalheContaScreen> {
   bool _isLoading = true;
-  Map<String, dynamic> _conta = {};
+  List<dynamic> _contas = [];
   String _error = '';
   String? _mesSelecionado;
   String? _anoSelecionado;
+  bool _mostrarRecorrentes = false;
 
   @override
   void initState() {
     super.initState();
     DateTime agora = DateTime.now();
-    _mesSelecionado = agora.month.toString().padLeft(2, '0'); // Mês atual (ex: "02")
+    _mesSelecionado =
+        agora.month.toString().padLeft(2, '0'); // Mês atual (ex: "02")
     _anoSelecionado = agora.year.toString(); // Ano atual (ex: "2025")
-    fetchDetalhesConta();
+    fetchContas();
   }
 
-  // Método para gerar meses
   List<String> gerarMeses() {
     return List.generate(12, (index) => (index + 1).toString().padLeft(2, '0'));
   }
 
   List<String> gerarAnos(int quantidade) {
     DateTime agora = DateTime.now();
-    return List.generate(quantidade, (index) => (agora.year + index).toString());
+    return List.generate(
+        quantidade, (index) => (agora.year + index).toString());
   }
 
-  // Método para formatar o valor com duas casas decimais
-  String _formatarValor(String valor) {
-    // Substituir vírgula por ponto para que o valor seja interpretado corretamente como double
-    double valorDouble = double.tryParse(valor.replaceAll(',', '.')) ?? 0.0;
-    return valorDouble.toStringAsFixed(2); // Formatar o valor para 2 casas decimais
-  }
-
-  // Método para buscar os detalhes da conta
-  Future<void> fetchDetalhesConta() async {
+  Future<void> fetchContas() async {
   setState(() {
     _isLoading = true;
     _error = '';
@@ -54,35 +47,44 @@ class _DetalheContaScreenState extends State<DetalheContaScreen> {
 
   try {
     final userId = globals.userId;
-    String url = 'http://192.168.15.114:3000/contas/${widget.contaId}?user_id=$userId';
-
-    // Adiciona mes e ano corretamente na URL
-    if (_mesSelecionado != null && _anoSelecionado != null) {
-      url += '&mes=$_mesSelecionado&ano=$_anoSelecionado';
-    }
-
-    print("URL: $url"); // Adicionando um print para verificar a URL gerada.
+    String url = 'http://192.168.15.114:3000/contas?user_id=$userId';
 
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+      final contasFiltradas = data.where((conta) {
+        final bool isRecorrente = conta['eh_mensal'] == 1;
+        final dataConta = DateTime.parse(conta['data_conta']);
+        final mesSelecionado = int.parse(_mesSelecionado!);
+        final anoSelecionado = int.parse(_anoSelecionado!);
 
-      print("Resposta da API: $data");
+        // Filtra contas recorrentes ou todas as contas conforme _mostrarRecorrentes
+        if (_mostrarRecorrentes) {
+          return isRecorrente; // Filtra apenas as recorrentes
+        } else {
+          if (isRecorrente) {
+            return dataConta.month <= mesSelecionado && dataConta.year <= anoSelecionado;
+          } else {
+            return dataConta.month == mesSelecionado && dataConta.year == anoSelecionado;
+          }
+        }
+      }).toList();
+
+      // Verifica se a conta foi paga
+      for (var conta in contasFiltradas) {
+        final bool isPago =
+            await verificarSeContaFoiPagaNoMesAtual(conta['id']);
+        conta['status'] = isPago ? 'Pago' : 'A pagar';
+      }
 
       setState(() {
-        if (data is Map<String, dynamic>) {
-          _conta = data;
-        } else if (data is List) {
-          _conta = data.isNotEmpty ? data[0] : {};
-        } else {
-          _conta = {};
-        }
+        _contas = contasFiltradas;
         _isLoading = false;
       });
     } else {
       setState(() {
-        _error = 'Erro ao carregar detalhes da conta: ${response.statusCode}';
+        _error = 'Erro ao carregar contas: ${response.statusCode}';
         _isLoading = false;
       });
     }
@@ -95,88 +97,253 @@ class _DetalheContaScreenState extends State<DetalheContaScreen> {
 }
 
 
+  Future<bool> verificarSeContaFoiPagaNoMesAtual(int contaId) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'http://192.168.15.114:3000/conta_paga?conta_id=$contaId&mes=$_mesSelecionado&ano=$_anoSelecionado'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data.isNotEmpty;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<void> marcarComoPago(int contaId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://192.168.15.114:3000/conta_paga'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'conta_id': contaId,
+          'data_pagamento': DateTime.now().toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        fetchContas();
+      } else {
+        setState(() {
+          _error = 'Erro ao marcar como pago: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Erro de conexão: $e';
+      });
+    }
+  }
+
+  Future<void> excluirConta(int contaId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('http://192.168.15.114:3000/contas/$contaId'),
+      );
+
+      if (response.statusCode == 200) {
+        fetchContas();
+      } else {
+        setState(() {
+          _error = 'Erro ao excluir conta: ${response.statusCode}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = 'Erro de conexão: $e';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     List<String> meses = gerarMeses();
-    List<String> anos = gerarAnos(5); // Mostra 5 anos para frente
+    List<String> anos = gerarAnos(5);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detalhes da Conta'),
+        title: const Text('Lista de Contas'),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error.isNotEmpty
-              ? Center(child: Text(_error))
-              : Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          // Seletor de Mês
-                          Expanded(
-                            child: DropdownButton<String>(
-                              value: _mesSelecionado,
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  _mesSelecionado = newValue;
-                                });
-                                fetchDetalhesConta();
-                              },
-                              items: meses.map<DropdownMenuItem<String>>((String value) {
-                                return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-
-                          const SizedBox(width: 16), // Espaço entre os campos
-
-                          // Seletor de Ano
-                          Expanded(
-                            child: DropdownButton<String>(
-                              value: _anoSelecionado,
-                              onChanged: (String? newValue) {
-                                setState(() {
-                                  _anoSelecionado = newValue;
-                                });
-                                fetchDetalhesConta();
-                              },
-                              items: anos.map<DropdownMenuItem<String>>((String value) {
-                                return DropdownMenuItem<String>(
-                                  value: value,
-                                  child: Text(value),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Acessar dados da conta
-                      Text(
-                        'Título: ${_conta['titulo']}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Aqui estamos formatando o valor com duas casas decimais
-                      Text('Valor: R\$ ${_formatarValor(_conta['valor'] ?? '0,00')}'),
-                      Text('Data de Vencimento: ${_conta['data_conta']}'),
-                      Text('É Mensal: ${(_conta['eh_mensal'] == '1' || _conta['eh_mensal'] == 1) ? 'Sim' : 'Não'}'),
-                      Text('Dia do Vencimento: ${_conta['dia_conta']}'),
-                    ],
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: DropdownButton<String>(
+                    value: _mesSelecionado,
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _mesSelecionado = newValue;
+                      });
+                      fetchContas();
+                    },
+                    items: meses.map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0)),
+                    // O parâmetro "decoration" não existe em DropdownButton.
+                    // Para modificar o campo, você pode usar "decoration" dentro de um TextField ou similar.
                   ),
                 ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: DropdownButton<String>(
+                    value: _anoSelecionado,
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _anoSelecionado = newValue;
+                      });
+                      fetchContas();
+                    },
+                    items: anos.map<DropdownMenuItem<String>>((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    style: TextStyle(color: const Color.fromARGB(255, 0, 0, 0)),
+                    // O parâmetro "decoration" não existe em DropdownButton.
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SwitchListTile(
+            title: const Text("Mostrar apenas contas recorrentes"),
+            value: _mostrarRecorrentes,
+            onChanged: (bool value) {
+              setState(() {
+                _mostrarRecorrentes = value;
+              });
+              fetchContas();
+            },
+          ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _error.isNotEmpty
+                    ? Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _error,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: fetchContas,
+                            child: const Text('Tentar novamente'),
+                          ),
+                        ],
+                      )
+                    : ListView.builder(
+                        itemCount: _contas.length,
+                        itemBuilder: (context, index) {
+                          final conta = _contas[index];
+                          final bool isRecorrente = conta['eh_mensal'] == 1;
+
+                          return Card(
+                            margin: const EdgeInsets.symmetric(
+                                vertical: 4, horizontal: 8),
+                            elevation: 5,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ListTile(
+                                    title: Text(conta['titulo']),
+                                    subtitle: Text(
+                                      isRecorrente
+                                          ? "Vencimento dia: ${conta['dia_conta'] ?? ''} - Valor: R\$ ${double.tryParse(conta['valor']?.replaceAll(',', '.') ?? '0')?.toStringAsFixed(2) ?? '0.00'}"
+                                          : "${conta['data_conta'] ?? ''} - Valor: R\$ ${double.tryParse(conta['valor']?.replaceAll(',', '.') ?? '0')?.toStringAsFixed(2) ?? '0.00'}",
+                                    ),
+                                    trailing: Text(
+                                      conta['status'] ?? 'A pagar',
+                                      style: TextStyle(
+                                        color: conta['status'] == 'Pago'
+                                            ? Colors.green
+                                            : Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      OutlinedButton(
+                                        onPressed: () {
+                                          marcarComoPago(conta['id']);
+                                        },
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white, side: BorderSide(
+                                              color: const Color.fromARGB(255, 34, 156, 10)), // Borda azul
+                                          backgroundColor:
+                                              Color.fromARGB(255, 34, 156, 10), // Texto branco
+                                        ),
+                                        child: const Text('Pago'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      OutlinedButton(
+                                        onPressed: () async {
+                                          final resultado =
+                                              await Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  EditarContaScreen(
+                                                      contaId: conta['id']),
+                                            ),
+                                          );
+
+                                          if (resultado == true) {
+                                            setState(() {
+                                              fetchContas();
+                                            });
+                                          }
+                                        },
+                                        style: OutlinedButton.styleFrom(foregroundColor: Colors.white,
+                                          side: BorderSide(color: const Color.fromARGB(255, 29, 138, 226)),backgroundColor:
+                                              Color.fromARGB(255, 29, 138, 226),
+                                        ),
+                                        child: const Text('Editar'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      OutlinedButton(
+                                        onPressed: () {
+                                          excluirConta(conta['id']);
+                                        },
+                                        style: OutlinedButton.styleFrom(foregroundColor: Colors.white,
+                                          side: BorderSide(color: const Color.fromARGB(255, 212, 8, 8)),backgroundColor:
+                                              Color.fromARGB(255, 212, 8, 8),
+                                        ),
+                                        child: const Text('Excluir'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }

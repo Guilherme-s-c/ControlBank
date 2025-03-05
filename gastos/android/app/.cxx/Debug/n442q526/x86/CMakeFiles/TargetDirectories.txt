@@ -1,0 +1,2 @@
+C:/Users/Gabriel/Desktop/gasto/gastos/android/app/.cxx/Debug/n442q526/x86/CMakeFiles/edit_cache.dir
+C:/Users/Gabriel/Desktop/gasto/gastos/android/app/.cxx/Debug/n442q526/x86/CMakeFiles/rebuild_cache.dir
