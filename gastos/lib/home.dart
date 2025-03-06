@@ -239,7 +239,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => GastoScreen()),
+                          MaterialPageRoute(
+                              builder: (context) => GastoScreen()),
                         ).then((_) {
                           fetchData();
                           fetchUltimosGastos();
@@ -248,7 +249,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6200EE), // Ciano
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -274,7 +276,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF6200EE), // Ciano
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -331,10 +334,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _ultimosGastos.isEmpty
                     ? const Text('Nenhum gasto recente')
                     : Column(
-                        children: _ultimosGastos.map((gasto) {
+                        children: _ultimosGastos.map<Widget>((gasto) {
+                          final dataGasto = DateTime.parse(gasto['data']);
+                          final dataFormatada =
+                              '${dataGasto.day.toString().padLeft(2, '0')}/${dataGasto.month.toString().padLeft(2, '0')}/${dataGasto.year}';
+
                           return _buildListItem(
                             gasto['titulo'],
-                            'R\$ ${double.parse(gasto['valor'].replaceAll(',', '.')).toStringAsFixed(2)} - ${gasto['data']}',
+                            'R\$ ${double.parse(gasto['valor'].replaceAll(',', '.')).toStringAsFixed(2)} - $dataFormatada',
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -354,10 +361,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _ultimasContas.isEmpty
                     ? const Text('Nenhuma conta recente')
                     : Column(
-                        children: _ultimasContas.map((conta) {
+                        children: _ultimasContas.map<Widget>((conta) {
+                          final dataConta = DateTime.parse(conta['data_conta']);
+                          final dataFormatada =
+                              '${dataConta.day.toString().padLeft(2, '0')}/${dataConta.month.toString().padLeft(2, '0')}/${dataConta.year}';
+
                           return _buildListItem(
                             conta['titulo'],
-                            'R\$ ${double.parse(conta['valor'].replaceAll(',', '.')).toStringAsFixed(2)} - ${conta['data_conta']}',
+                            'R\$ ${double.parse(conta['valor'].replaceAll(',', '.')).toStringAsFixed(2)} - $dataFormatada',
                             onTap: () {
                               Navigator.push(
                                 context,
@@ -440,13 +451,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                 return _buildListItem(
                                   parcela['titulo'],
                                   'R\$ ${double.parse(parcela['valor'].replaceAll(',', '.')).toStringAsFixed(2)} - $dataFormatada',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            DetalheGastoScreen(),
+                                      ),
+                                    );
+                                  },
                                 );
                               }).toList();
                             }).toList(),
                           ),
                   ],
                 ),
-              ),
+              )
             ],
           ),
         ),

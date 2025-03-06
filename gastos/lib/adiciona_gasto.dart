@@ -87,8 +87,8 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
           MaterialPageRoute(builder: (context) => HomeScreen()),
         );
       } else {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Erro ao adicionar gasto!')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Erro ao adicionar gasto!')));
       }
     }
   }
@@ -168,10 +168,16 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
                 ],
               ),
 
+              SizedBox(height: 16),
               // Campo Título
               TextFormField(
                 controller: _tituloController,
-                decoration: const InputDecoration(labelText: 'Título'),
+                decoration: InputDecoration(
+                  labelText: 'Título',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Por favor, insira um título';
@@ -184,14 +190,18 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
                   });
                 },
               ),
+              SizedBox(height: 16), // Espaçamento entre os campos
 
               // Campo Valor
               TextFormField(
                 controller: _valorController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Valor total da compra',
                   prefixText: 'R\$ ',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
                 ),
                 inputFormatters: [valorMask], // Aplica a máscara de valor
                 onChanged: (value) {
@@ -202,13 +212,19 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
                   });
                 },
               ),
+              SizedBox(height: 16), // Espaçamento entre os campos
 
               // Campo Data
               TextFormField(
                 controller: _dataController,
                 keyboardType: TextInputType.datetime,
                 inputFormatters: [dateMask], // Aplica a máscara de data
-                decoration: const InputDecoration(labelText: 'Data (dd/mm/yyyy)'),
+                decoration: InputDecoration(
+                  labelText: 'Data (dd/mm/yyyy)',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Por favor, insira a data';
@@ -221,17 +237,23 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
                   });
                 },
               ),
+              SizedBox(height: 16), // Espaçamento entre os campos
 
               // Campo Forma de Pagamento com ícones
               DropdownButtonFormField<String>(
                 value: _formaPagamento,
-                decoration: const InputDecoration(labelText: 'Forma de Pagamento'),
+                decoration: InputDecoration(
+                  labelText: 'Forma de Pagamento',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                ),
                 onChanged: (newValue) {
                   setState(() {
                     _formaPagamento = newValue!;
                   });
                 },
-                items: ['Boleto', 'Cartão débito','Cartão crédito', 'Dinheiro']
+                items: ['Boleto', 'Cartão débito', 'Cartão crédito', 'Dinheiro']
                     .map((forma) => DropdownMenuItem(
                           value: forma,
                           child: Row(
@@ -247,6 +269,7 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
                         ))
                     .toList(),
               ),
+              SizedBox(height: 2), // Espaçamento entre os campos
 
               // Campo Parcelado
               SwitchListTile(
@@ -264,8 +287,12 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
                 // Quantidade de Parcelas
                 TextFormField(
                   initialValue: _quantidadeParcelas.toString(),
-                  decoration:
-                      const InputDecoration(labelText: 'Quantidade de Parcelas'),
+                  decoration: InputDecoration(
+                    labelText: 'Quantidade de Parcelas',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
                   keyboardType: TextInputType.number,
                   onChanged: (value) {
                     setState(() {
@@ -274,12 +301,17 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
                   },
                 ),
               ],
+              SizedBox(height: 10), // Espaçamento entre os campos
 
               // Botão para enviar
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16.0),
                 child: ElevatedButton(
                   onPressed: _enviarFormulario,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF6200EE), // Cor de fundo
+                    foregroundColor: Colors.white, // Cor do texto
+                  ),
                   child: const Text('Adicionar Gasto'),
                 ),
               ),
@@ -302,18 +334,31 @@ class _AdicionarGastoScreenState extends State<AdicionarGastoScreen> {
         width: 110,
         height: 120,
         child: Card(
-          color: _categoria == categoria ? Colors.blueAccent : Colors.white,
+          color:
+              _categoria == categoria ? const Color(0xFF6200EE) : Colors.white,
           elevation: 4.0,
           child: Padding(
             padding: const EdgeInsets.all(8.0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(getCategoriaIcon(categoria), size: 40),
+                Icon(
+                  getCategoriaIcon(categoria),
+                  size: 40,
+                  color: _categoria == categoria
+                      ? Colors.white
+                      : Colors.black, // Cor condicional
+                ),
                 const SizedBox(height: 8),
                 Text(
                   getCategoriaNome(categoria),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _categoria == categoria
+                        ? Colors.white
+                        : Colors.black, // Cor condicional
+                  ),
                 ),
               ],
             ),

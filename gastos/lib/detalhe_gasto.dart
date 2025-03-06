@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'globals.dart' as globals;
+import 'editar_gasto.dart'; // Supondo que você tenha uma tela para editar o gasto
+import 'package:intl/intl.dart';
+
 
 class DetalheGastoScreen extends StatefulWidget {
   const DetalheGastoScreen({super.key});
@@ -22,7 +25,8 @@ class _DetalheGastoScreenState extends State<DetalheGastoScreen> {
   void initState() {
     super.initState();
     DateTime agora = DateTime.now();
-    _mesSelecionado = agora.month.toString().padLeft(2, '0'); // Mês atual (ex: "02")
+    _mesSelecionado =
+        agora.month.toString().padLeft(2, '0'); // Mês atual (ex: "02")
     _anoSelecionado = agora.year.toString(); // Ano atual (ex: "2025")
     fetchGastos();
   }
@@ -33,7 +37,8 @@ class _DetalheGastoScreenState extends State<DetalheGastoScreen> {
 
   List<String> gerarAnos(int quantidade) {
     DateTime agora = DateTime.now();
-    return List.generate(quantidade, (index) => (agora.year + index).toString());
+    return List.generate(
+        quantidade, (index) => (agora.year + index).toString());
   }
 
   Future<void> fetchGastos() async {
@@ -72,6 +77,22 @@ class _DetalheGastoScreenState extends State<DetalheGastoScreen> {
       setState(() {
         _error = 'Erro de conexão: $e';
         _isLoading = false;
+      });
+    }
+  }
+
+  // Função para excluir o gasto
+  Future<void> excluirGasto(String idGasto) async {
+    final response = await http.delete(
+      Uri.parse('http://192.168.15.114:3000/gastos/$idGasto'),
+    );
+
+    if (response.statusCode == 200) {
+      // Atualizar a lista de gastos após excluir
+      fetchGastos();
+    } else {
+      setState(() {
+        _error = 'Erro ao excluir gasto: ${response.statusCode}';
       });
     }
   }
@@ -156,12 +177,119 @@ class _DetalheGastoScreenState extends State<DetalheGastoScreen> {
                         itemCount: _gastos.length,
                         itemBuilder: (context, index) {
                           final gasto = _gastos[index];
-                          return ListTile(
-                            title: Text(gasto['titulo']),
-                            subtitle: Text(
-                              "${gasto['categoria']} - R\$ ${gasto['valor']} - ${gasto['parcela_atual'] ?? ''}",
+                          return Card(
+                            margin: const EdgeInsets.symmetric(
+                                vertical: 8.0, horizontal: 16.0),
+                            elevation: 5,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            trailing: Text(gasto['data']),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ListTile(
+                                    title: Text(gasto['titulo']),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                            "${gasto['categoria']} - R\$ ${gasto['valor']}"),
+                                        if (gasto['parcela_atual'] != null)
+                                          Text(
+                                              "Parcela: ${gasto['parcela_atual']}"),
+                                          Text("Data: ${DateFormat('dd/MM/yyyy').format(DateTime.parse(gasto['data']))}"),
+
+                                      ],
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      // Botão Editar
+                                      OutlinedButton(
+                                        onPressed: () {
+                                          // Editar: Navega para a tela de edição
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  EditarGastoScreen(
+                                                      gasto: gasto),
+                                            ),
+                                          ).then((updated) {
+                                            if (updated == true) {
+                                              // A atualização foi bem-sucedida, então vamos recarregar os dados
+                                              fetchGastos();
+                                            }
+                                          });
+                                        },
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          side: BorderSide(
+                                            color: const Color.fromARGB(255, 29,
+                                                138, 226), // Cor da borda
+                                          ),
+                                          backgroundColor: Color.fromARGB(255,
+                                              29, 138, 226), // Cor de fundo
+                                        ),
+                                        child: const Text('Editar'),
+                                      ),
+
+                                      const SizedBox(width: 8),
+                                      // Botão Excluir
+                                      OutlinedButton(
+                                        onPressed: () {
+                                          // Excluir: Exclui o gasto
+                                          showDialog(
+                                            context: context,
+                                            builder: (BuildContext context) {
+                                              return AlertDialog(
+                                                title:
+                                                    const Text('Excluir Gasto'),
+                                                content: const Text(
+                                                    'Tem certeza de que deseja excluir este gasto?'),
+                                                actions: <Widget>[
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.of(context)
+                                                          .pop();
+                                                    },
+                                                    child:
+                                                        const Text('Cancelar'),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      excluirGasto(gasto['id']
+                                                          .toString());
+                                                      Navigator.of(context)
+                                                          .pop();
+                                                    },
+                                                    child:
+                                                        const Text('Excluir'),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        },
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          side: BorderSide(
+                                              color: const Color.fromARGB(255,
+                                                  212, 8, 8)), // Cor da borda
+                                          backgroundColor: Color.fromARGB(
+                                              255, 212, 8, 8), // Cor de fundo
+                                        ),
+                                        child: const Text('Excluir'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           );
                         },
                       ),

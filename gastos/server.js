@@ -2,6 +2,7 @@ const express = require('express');
 const mysql = require('mysql2/promise'); // Importação do mysql2 com promises
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const moment = require('moment');
 
 const app = express();
 app.use(cors());
@@ -25,7 +26,6 @@ const getConnection = () => {
 // Rota de login
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
-    console.log('Dados recebidos:', email, senha);
 
     if (!email || !senha) {
         return res.status(400).json({ message: 'Email e senha são obrigatórios' });
@@ -44,7 +44,6 @@ app.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Credenciais inválidas' });
         }
 
-        console.log('Login bem-sucedido para o usuário:', user.id);
         return res.status(200).json({
             success: true,
             id: user.id,
@@ -83,11 +82,9 @@ app.post('/usuario', async (req, res) => {
 // Adicionar uma conta
 app.post('/contas', async (req, res) => {
     const { user_id, titulo, valor, data_vencimento, eh_recorrente, dia_recorrencia } = req.body;
-    console.log('Dados recebidos:', { user_id, titulo, valor, data_vencimento, eh_recorrente, dia_recorrencia });
 
     // Verificar se todos os campos obrigatórios estão presentes
     if (!user_id || !titulo || !valor || !data_vencimento || eh_recorrente === undefined) {
-        console.log('Campos ausentes:', { user_id, titulo, valor, data_vencimento, eh_recorrente });
         return res.status(400).json({ error: 'Todos os campos obrigatórios são necessários' });
     }
 
@@ -130,8 +127,6 @@ app.post('/contas', async (req, res) => {
             eh_recorrente ? dia_recorrencia : null, // dia_conta (só preenche se for recorrente)
         ];
 
-        console.log('Executando query com dados:', values);
-
         // Executar a query
         await pool.query(query, values);
 
@@ -157,15 +152,6 @@ app.post('/gastos', async (req, res) => {
       quantidade_parcelas,
     } = req.body;
   
-    console.log('Dados recebidos:', {
-      user_id,
-      categoria,
-      titulo,
-      valor,
-      data,
-      forma_pagamento,
-      quantidade_parcelas,
-    });
   
     // Verificar se todos os campos obrigatórios estão presentes
     if (
@@ -177,7 +163,6 @@ app.post('/gastos', async (req, res) => {
       !forma_pagamento ||
       !quantidade_parcelas
     ) {
-      console.log('Campos ausentes:', req.body);
       return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
     }
   
@@ -200,15 +185,7 @@ app.post('/gastos', async (req, res) => {
         (user_id, categoria, titulo, valor, data, forma_pagamento, quantidade_parcelas) 
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
-      console.log('Executando query com dados:', [
-        user_id,
-        categoria,
-        titulo,
-        valor,
-        dataConvertida,
-        forma_pagamento,
-        quantidade_parcelas,
-      ]);
+
   
       // Executar a query
       await pool.query(query, [
@@ -288,10 +265,6 @@ app.get('/gastos', async (req, res) => {
 app.get('/contas', async (req, res) => {
   try {
       const { user_id, mes, ano, eh_mensal } = req.query;
-      console.log('user_id:', user_id); // Debug
-      console.log('mes:', mes); // Debug
-      console.log('ano:', ano); // Debug
-      console.log('eh_mensal:', eh_mensal); // Debug
 
       let query = 'SELECT * FROM conta WHERE user_id = ?';
       let params = [user_id];
@@ -306,11 +279,7 @@ app.get('/contas', async (req, res) => {
           params.push(eh_mensal);
       }
 
-      console.log('Query:', query); // Debug
-      console.log('Params:', params); // Debug
-
       const [results] = await pool.query(query, params);
-      console.log('Resultados:', results); // Debug
 
       res.json(results);
   } catch (err) {
@@ -344,6 +313,20 @@ app.delete('/contas/:id', async (req, res) => {
   } catch (err) {
     console.error('Erro ao excluir conta:', err);
     res.status(500).json({ error: 'Erro ao excluir conta' });
+  }
+});
+
+app.delete('/gastos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const query = 'DELETE FROM gasto WHERE id = ?';
+    const params = [id];
+
+    await pool.query(query, params);
+    res.status(200).json({ message: 'Gasto excluído com sucesso' });
+  } catch (err) {
+    console.error('Erro ao excluir gasto:', err);
+    res.status(500).json({ error: 'Erro ao excluir gasto' });
   }
 });
 
@@ -388,13 +371,32 @@ app.get('/contas/:id', async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar conta' });
   }
 });
+function formatarData(data) {
+  const partes = data.split('/');
+  return `${partes[2]}-${partes[1]}-${partes[0]}`;
+}
+
 app.put('/contas/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { titulo, valor, data_conta } = req.body;
+    const { titulo, valor, data_conta, data_vencimento, is_conta_mensal } = req.body;
+    console.log(titulo, valor, data_conta, data_vencimento, is_conta_mensal)
 
-    const query = 'UPDATE conta SET titulo = ?, valor = ?, data_conta = ? WHERE id = ?';
-    const params = [titulo, valor, data_conta, id];
+    // Verificar se o dia de pagamento é válido (de 1 a 31)
+    const diaPagamentoValido = Math.min(Math.max(data_vencimento, 1), 31);
+
+    // Convertendo a data de dd/MM/yyyy para yyyy-MM-dd
+    const dataContasFormatada = formatarData(data_conta);
+
+    // Convertendo o valor de conta_mensal para 1 (sim) ou 0 (não)
+    const ehMensal = is_conta_mensal ? 1 : 0;
+
+    // Se não for mensal, o campo dia_conta deve ser null
+    const diaConta = ehMensal ? diaPagamentoValido : null;
+
+    // Alterar a query para incluir os campos dia_pagamento e conta_mensal
+    const query = 'UPDATE conta SET titulo = ?, valor = ?, data_conta = ?, eh_mensal = ?, dia_conta = ? WHERE id = ?';
+    const params = [titulo, valor, dataContasFormatada, ehMensal, diaConta, id];
 
     await pool.query(query, params);
     res.status(200).json({ message: 'Conta atualizada com sucesso' });
@@ -403,6 +405,39 @@ app.put('/contas/:id', async (req, res) => {
     res.status(500).json({ error: 'Erro ao atualizar conta' });
   }
 });
+
+
+
+
+app.put('/gastos/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { categoria, titulo, valor, data, forma_pagamento, parcela_atual } = req.body;
+    // Formatar a data para yyyy-mm-dd
+    const formattedDate = moment(data, 'DD/MM/YYYY').format('YYYY-MM-DD');
+
+    const query = `
+      UPDATE gasto 
+      SET 
+        categoria = ?, 
+        titulo = ?, 
+        valor = ?, 
+        data = ?, 
+        forma_pagamento = ?, 
+        quantidade_parcelas = ? 
+      WHERE id = ?`;
+
+    const params = [ categoria, titulo, valor, formattedDate, forma_pagamento, parcela_atual, id];
+
+    await pool.query(query, params);
+    res.status(200).json({ message: 'Gasto atualizado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao atualizar gasto:', err);
+    res.status(500).json({ error: 'Erro ao atualizar gasto' });
+  }
+});
+
 app.post('/ganhos', async (req, res) => {
     const { user_id, descricao, valor, data_recebimento, eh_recorrente, dia_vencimento } = req.body;
 
@@ -551,7 +586,6 @@ app.get('/totais/:user_id', async (req, res) => {
 
   app.get('/contas-recorrentes/:user_id', async (req, res) => {
     const { user_id } = req.params;
-    console.log(user_id)
   
     try {
       // Consulta ao banco de dados
@@ -561,8 +595,6 @@ app.get('/totais/:user_id', async (req, res) => {
          WHERE user_id = ? and eh_mensal=1`,
         [user_id]
       );
-
-      console.log('Dados retornados do banco (contas recorrentes):', JSON.stringify(rows, null, 2)); // Log dos dados brutos do banco
 
       res.status(200).json(rows);
     } catch (err) {
